@@ -5,7 +5,7 @@ import spacy
 import re
 
 
-model  = joblib.load('tfidf_vectorizer.pkl')
+model  = joblib.load('F:/Resume and Job Posting matcher/Model/tfidf_vectorizer.pkl')
 
 job_input = ['''
 Manage and optimize content creation, including blogs, newsletters, video content, and social media posts.
