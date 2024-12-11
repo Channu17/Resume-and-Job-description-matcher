@@ -1,0 +1,8 @@
+scikit-learn
+flask
+joblib
+spacy
+os
+pypdf2
+
+
