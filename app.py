@@ -1,18 +1,20 @@
-from fastapi import FastAPI, File, UploadFile
-from typing import List
+from flask import Flask
+from flask import render_template, request , jsonify
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import TfidfVectorizer
 import joblib
 import spacy
 import re
 import PyPDF2
-import io
+import os
 
-# Load pre-trained TF-IDF vectorizer and spaCy model
+app = Flask(__name__)
+
+
 model = joblib.load('F:/Model/Model/tfidf_vectorizer.pkl')
 nlp = spacy.load('en_core_web_sm')
 
-app = FastAPI()
+
 
 def processing(content):
     """Process the text content: tokenize, lemmatize, and clean."""
@@ -25,6 +27,8 @@ def processing(content):
     processed_text = re.sub(r'[^A-Za-z0-9\s]', '', processed_text)
     return processed_text.lower()
 
+
+
 def extract_text_from_pdf(file):
     """Extract text from a PDF file."""
     pdf_reader = PyPDF2.PdfReader(file)
@@ -33,36 +37,44 @@ def extract_text_from_pdf(file):
         text += page.extract_text()
     return text
 
-@app.post("/match-resumes/")
-async def match_resumes(
-    job_description: str,
-    resumes: List[UploadFile] = File(...)
-):
-    # Process job description
-    job_tokens = processing(job_description)
-    job_vector = model.transform([job_tokens]).toarray()
 
-    # Process resumes and calculate similarity
-    scores = []
-    for idx, resume_file in enumerate(resumes):
-        file_content = await resume_file.read()
-        file_text = extract_text_from_pdf(io.BytesIO(file_content))
-        resume_tokens = processing(file_text)
-        resume_vector = model.transform([resume_tokens]).toarray()
-        similarity = cosine_similarity(resume_vector, job_vector)[0][0]
-        scores.append((resume_file.filename, similarity))
+@app.route('/home')
+@app.route('/')
+def home():
+    
+    return render_template('home.html')
 
-    # Sort resumes by similarity score in ascending order
-    sorted_scores = sorted(scores, key=lambda x: x[1])
 
-    return {
-        "job_description": job_description,
-        "ranked_resumes": [
-            {"filename": filename, "similarity_score": score}
-            for filename, score in sorted_scores
-        ]
-    }
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+@app.route('/resume_ranker', methods=['GET', 'POST'])
+def resume_ranker():
+    if request.method == 'POST':
+        # Get job description
+        job_description = request.form['job_description']
+        job_tokens = processing(job_description)
+        job_vector = model.transform([job_tokens]).toarray()
+
+        # Process uploaded resumes
+        scores = []
+        uploaded_files = request.files.getlist('resumes')
+        for resume_file in uploaded_files:
+            try:
+                file_text = extract_text_from_pdf(resume_file)
+                resume_tokens = processing(file_text)
+                resume_vector = model.transform([resume_tokens]).toarray()
+                similarity = cosine_similarity(resume_vector, job_vector)[0][0]
+                scores.append((resume_file.filename, similarity))
+            except Exception as e:
+                return render_template('resumeranker.html', error=f"Error processing file {resume_file.filename}: {e}")
+        # Sort resumes by similarity score
+        sorted_scores = sorted(scores, key=lambda x: x[1], reverse=True)
+
+        return render_template('results.html', 
+                               job_description=job_description, 
+                               ranked_resumes=sorted_scores)
+
+    return render_template('resumeranker.html')
+    
+
+if __name__ == '__main__':
+    app.run(debug=True)
