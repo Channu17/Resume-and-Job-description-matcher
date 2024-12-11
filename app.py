@@ -74,7 +74,27 @@ def resume_ranker():
                                ranked_resumes=sorted_scores)
 
     return render_template('resumeranker.html')
+
+@app.route('/ATS', methods=['GET', 'POST'])
+def ATS():
+    if request.method == 'POST':
+        job_description = request.form['job_description']
+        job_token = processing(job_description)
+        job_vector = model.transform([job_token]).toarray()
+        
+        uploaded_file = request.files.getlist('resumes')[0]
+        try:
+            file_text = extract_text_from_pdf(uploaded_file)
+            resume_token = processing(file_text)
+            resume_vector = model.transform([resume_token]).toarray()
+            similarity_score = cosine_similarity(resume_vector, job_vector)[0][0]
+            similarity_score = (similarity_score)*100
+        except Exception as e:
+            return render_template('resumeranker.html', error=f"Error processing file {uploaded_file.filename}: {e}")
+        
+        return render_template('ATS.html', job_description=job_description, similarity_score = int(similarity_score))
     
+    return render_template('ATS.html')
 
 if __name__ == '__main__':
-    app.run(debug=False, host='0.0.0.0')
+    app.run(debug=True, host='0.0.0.0')
