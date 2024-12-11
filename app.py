@@ -11,7 +11,7 @@ import os
 app = Flask(__name__)
 
 
-model = joblib.load('F:/Model/Model/tfidf_vectorizer.pkl')
+model = joblib.load('Model/tfidf_vectorizer.pkl')
 nlp = spacy.load('en_core_web_sm')
 
 
